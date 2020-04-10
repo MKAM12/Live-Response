@@ -1,0 +1,341 @@
+#!/bin/bash
+
+#Response script written by Malak K. AlMutairi
+#script version is 001
+#This script is to collect volatile data and selected non-volatile data
+
+clear
+
+#enable history command
+HISTFILE=~/.bash_history
+set -o history 
+
+#Define important variables
+current_path=`pwd`
+computer_date=`date`
+
+#print a message to the user
+echo "This script will be collecting critical volatile and some selected non-volatile data"
+echo "Please fill the below information before starting the collection process:"
+
+
+#Collect information from user
+read -p "1. Investigator's Name: " investigator_name
+read -p "2. Case Name: " case_name
+read -p "3. What is the storage serial Number: " serial_number
+read -p "4. Watch date and time: " watch_date_time
+
+#Ask user where to store data
+read -p "5. Where you want to store data (absolute path to target directory): " data
+if [ -d $data ]
+then
+#create evidence folder within the path that was provided by the user
+mkdir $data/evidence
+collecting_path=$data/evidence
+echo "Data will be collected in $collecting_path "
+else
+#if user entered an invalid path/location it will be collected in the current location
+mkdir $current_path/$data
+collecting_path=$current_path/$data
+echo "Data will be collected in $collecting_path"
+fi
+
+#create folder within the data folder to collect error messages for all commands
+mkdir $collecting_path/error
+
+#store information to case_info file
+echo "The invistigator Name is: $investigator_name" >> $collecting_path/case_info.txt
+echo "The case name is: $case_name" >> $collecting_path/case_info.txt
+echo "The storage serial number is: $serial_number" >> $collecting_path/case_info.txt
+echo "The watch date and time is : $watch_date_time" >> $collecting_path/case_info.txt
+echo ""
+echo "The collection start date and time is : $computer_date" | tee -a $collecting_path/case_info.txt
+
+
+echo " " | tee -a $collecting_path/case_info.txt
+echo "***********        Start Collecting Volatile Data:        ***********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+
+#List apps associated with open ports
+echo "Collecting Now: applications asscociated with open ports"
+#check if netstat is installed in the system
+tool="netstat"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+#use netstat to collect list of apps associated with open ports
+netstat -anp >> $collecting_path/apps.txt 2> $collecting_path/error/apps_errors.txt
+echo "List of apps associated with open ports has been collected (apps.txt)" | tee -a $collecting_path/case_info.txt
+else
+#use lsof if netstat is not installed
+lsof -n >> $collecting_path/apps2.txt 2> $collecting_path/error/apps2_errors.txt 
+echo "List of apps associated with open ports has been collected (apps2.txt)" | tee -a $collecting_path/case_info.txt
+fi
+
+#List open files
+echo "Collecting Now: Open files"
+lsof >> $collecting_path/open_files.txt 2> $collecting_path/error/open_files_errors.txt
+echo "List of open files has been collected (open_files.txt)" | tee -a $collecting_path/case_info.txt
+
+#Determin open ports
+echo "Collecting Now: Open ports"
+#check if netstat is installed in the system
+tool="netstat"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+#use netstat to collect open ports
+netstat -an >> $collecting_path/all_open_ports.txt 2> $collecting_path/error/all_open_ports_errors.txt
+netstat -ln >> $collecting_path/all_listening_ports.txt 2> $collecting_path/error/all_listening_ports_errors.txt 
+echo "List of all open ports has been collected (all_open_ports.txt and all_listening_ports.txt)" | tee -a $collecting_path/case_info.txt
+else
+#use lsof if netstat is not installed
+lsof -i -P -n >> $collecting_path/all_open_ports.txt 2> $collecting_path/error/all_open_ports_errors.txt
+lsof -i -P -n | grep 'LISTEN\|LISTENING' >> $collecting_path/all_listening_ports.txt 2> $collecting_path/error/all_listening_ports_errors.txt 
+echo "List of all open ports has been collected (all_open_ports.txt and all_listening_ports.txt)" | tee -a $collecting_path/case_info.txt
+fi
+
+#Determin running process
+echo "Collecting Now: Running Proccesses"
+#use ps to collect running processes
+ps -ef >> $collecting_path/running_process_ef.txt 2> $collecting_path/error/running_process_ef_errors.txt
+ps -aux >> $collecting_path/running_process_bsd.txt 2> $collecting_path/error/running_process_bsd_errors.txt
+echo "List of all running processes has been collected (running_process_ef.txt and running_process_bsd.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#List recent connection
+echo "Collecting Now: Recent Connection"
+#check if netstat is installed in the system
+tool="netstat"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+#use netstat to collect recent connection
+netstat -rn >> $collecting_path/route_table.txt 2> $collecting_path/error/route_table_errors.txt
+echo "List of recent connection has been collected (route_table.txt)" | tee -a $collecting_path/case_info.txt
+else
+#use ip rout to collect recent connection
+ip route list >> $collecting_path/ip_route_list.txt 2> $collecting_path/error/ip_route_list_errors.txt
+echo "List of recent connection has been collected (ip_route_list.txt)" | tee -a $collecting_path/case_info.txt
+fi
+
+#Get clipboard data
+echo "Collecting Now: Clipboard Data"
+#check if xsel tool is installed
+tool="xsel"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+xsel >> $collecting_path/clipboard.txt 2> $collecting_path/error/clipboard_errors.txt
+echo "Clipboard data has been collected (clipboard.txt)" | tee -a $collecting_path/case_info.txt
+else
+echo "Copying clipboard conetnet has failed, no pakage installed"
+fi
+
+#Record arp cache
+echo "Collecting Now: Arp cache"
+#check if arp is installed
+tool="arp"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+#use arp to collect arp cache
+arp -a >> $collecting_path/arp_cache.txt 2> $collecting_path/error/arp_cache_errors.txt
+echo "List of all arp cache has been collected (arp_cache.txt)" | tee -a $collecting_path/case_info.txt
+else
+#use ip n to collect arp cash if arp is not installed
+ip n >> $collecting_path/arp_cache.txt 2> $collecting_path/error/arp_cache_errors.txt
+echo "List of all arp cache has been collected (arp_cache.txt)" | tee -a $collecting_path/case_info.txt
+fi
+
+#check for suspicious connections - sniffers
+echo "Collecting Now: Suspicious connections"
+#check if netstat is installed
+tool="netstat"
+which $tool > /dev/null 2>&1
+if [ $? == 0 ]
+then
+#use netstat to collect suspicious connection with promisco mode
+netstat -i >> $collecting_path/suspicious_connection.txt 2> $collecting_path/error/suspicious_connection_errors.txt
+echo "List of all suspicious connection has been collected (suspicious_connection.txt)" | tee -a $collecting_path/case_info.txt
+else
+#use ip tool if netstat is not installed
+ip -s link >> $collecting_path/suspicious_connection.txt 2> $collecting_path/error/suspicious_connection_errors.txt
+echo "List of all suspicious connection has been collected (suspicious_connection.txt)" | tee -a $collecting_path/case_info.txt
+fi
+
+#copy kernel buffer ring buffer - dmesg
+echo "Collecting Now: kernel ring buffer"
+mkdir $collecting_path/dmesg
+dmesg > $collecting_path/dmesg/dmesg.txt
+echo "kernel ring buffer has been collected (dmesg.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#print a message to the user that important volatile data has been collected
+echo " " | tee -a $collecting_path/case_info.txt
+echo "***********        Finished Collecting Volatile Data:     ***********" | tee -a $collecting_path/case_info.txt
+
+
+#Collecting selected non-volatile data
+
+echo " " | tee -a $collecting_path/case_info.txt
+echo "***********       Start Collecting Non-Volatile Data:     ***********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+#Record IP information 
+echo "Collecting Now: IP information"
+#use ip tool to collect system's ip information
+ip addr show >> $collecting_path/ip_info.txt 2> $collecting_path/error/ip_info_errors.txt
+echo "IP information has been collected (ip_info.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#Record system information
+echo "Collecting Now: System Information"
+#use uname to collect system's information
+uname -a >> $collecting_path/system_info.txt 2> $collecting_path/error/system_info_errors.txt
+echo "System information has been collected (system_info.txt)" | tee -a $collecting_path/case_info.txt
+
+#Record Environement Variables
+echo "Collecting Now: Environment Variables"
+#use env to collect environement variables
+env >> $collecting_path/env_variables.txt 2> $collecting_path/error/env_variables_errors.txt 
+echo "List of Environment Variable has been collected (env_variables.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#Record who is logged on
+echo "Collecting Now: Logged in users"
+#use w, last,lastb to collect information about logged users
+w >> $collecting_path/whoison.txt 2> $collecting_path/error/whoison_errors.txt
+last >> $collecting_path/last_loggedon.txt 2> $collecting_path/error/last_loggedon_errors.txt
+lastb >> $collecting_path/failure_logged_attempts.txt 2> $collecting_path/error/failure_logged_attempts_errors.txt
+echo "List of logged on users has been collected (whoison.txt and last_loggedon.txt and failure_logged_attempts.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#Record modification, and access times of all files
+echo "Collecting Now: Modification and Access times of all files"
+#use ls to collect all files based on thier last access, modified
+ls -alRu / >> $collecting_path/all_accessTime.txt 2> $collecting_path/error/all_accessTime_errors.txt
+ls -alRc / >> $collecting_path/inode_modification_Time.txt 2> $collecting_path/error/inode_modification_Time_errors.txt
+ls -alR / >> $collecting_path/all_modificationTime.txt 2> $collecting_path/error/all_modificationTime_errors.txt
+echo "List of record modification and access times has been collected (all_accessTime.txt and inode_modification_Time.txt and all_modificationTime.txt)" | tee -a $collecting_path/case_info.txt
+
+#Record scheduall tasks
+echo "Collecting Now: Schedual Tasks"
+#use crontab to collect information about scheduall task
+crontab -l >> $collecting_path/schedualtasks.txt 2> $collecting_path/error/schedualtasks_errors.txt
+crontab -l -u root >> $collecting_path/schedualtasks_roots.txt 2> $collecting_path/error/schedualtasks_roots_errors.txt
+echo "List of scheduall tasks has been collected (schedualtasks.txt and schedualtasks_roots_errors.txt)" | tee -a $collecting_path/case_info.txt
+
+#Record mounted devices
+echo "Collecting Now: Mounted Devices"
+#use mount to collect mounted devices
+mount >> $collecting_path/mounted_devices.txt 2> $collecting_path/error/mounted_devices_errors.txt
+echo "List of mounted devices has been collected (mounted_devices.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#Record partition table
+echo "Collecting Now: Partition table"
+#use fdisk to collect partition table
+fdisk -l >> $collecting_path/partition_table.txt 2> $collecting_path/error/partition_table_errors.txt
+echo "List of partition table has been collected (partition_table.txt)" | tee -a $collecting_path/case_info.txt
+
+
+#Record KLM (Kernel Loaded Modules)
+echo "Collecting Now: Kernel loaded modules"
+#use lsmod to collect KLM
+lsmod >> $collecting_path/loaded_modules_list.txt 2> $collecting_path/error/loaded_modules_list_errors.txt 
+echo "List of Kernel Loaded Modules has been collected (loaded_modules_list.txt)" | tee -a $collecting_path/case_info.txt
+
+
+
+#print a message to the user that important non-volatile data has been collected
+echo " " | tee -a $collecting_path/case_info.txt
+echo "***********     Finished Collecting Non-Volatile Data     ***********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+
+#copy important log files
+
+echo " " | tee -a $collecting_path/case_info.txt
+echo "*********** Start Collecting Log and Configuration Files: ***********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+#copy var logs
+if [ -d /var/ ]
+then
+echo "Collecting Now: copying var folder"
+cp -r /var/ $collecting_path/
+echo "var folder has been collected (var)" | tee -a $collecting_path/case_info.txt
+else
+echo "var folder was not found" | tee -a $collecting_path/case_info.txt
+fi
+
+#copy temp logs
+if [ -d /temp/ ]
+then
+echo "Collecting Now: Copying temp folder"
+cp -r /temp/ $collecting_path/
+echo "temp folder has been collected (temp)" | tee -a $collecting_path/case_info.txt
+else
+echo "temp folder was not found" | tee -a $collecting_path/case_info.txt
+fi
+
+#copy dev logs
+if [ -d /dev/ ]
+then
+echo "Collecting Now: Copying dev folder"
+
+cp -r /dev/ $collecting_path/
+echo "dev folder has been collected (dev)" | tee -a $collecting_path/case_info.txt
+else
+echo "dev folder was not found" | tee -a $collecting_path/case_info.txt
+fi
+
+
+#copy etc folder
+if [ -d /etc/ ]
+then
+echo "Collecting Now: Copying etc folder"
+cp -r /etc/ $collecting_path/
+echo "etc folder has been collected (etc)" | tee -a $collecting_path/case_info.txt
+else
+echo "dev folder was not collected" | tee -a $collecting_path/case_info.txt
+fi
+
+#print a message that logs and configuration files have been collected
+echo " " | tee -a $collecting_path/case_info.txt
+echo "********** Finished Collecting Log and Configuration Files **********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+
+
+#calculating evidence checksum:
+echo " " | tee -a $collecting_path/case_info.txt
+echo "Collecting Now: Calculating MD5 for all collected evidences"
+find $collecting_path/ -type f -xdev -exec md5sum -b {} \; >> $collecting_path/evidence_checksum.txt 2> $collecting_path/error/evidence_checksum_errors.txt
+echo "List of evidence checksum has been collected (evidence_checksum.txt)" | tee -a $collecting_path/case_info.txt
+
+
+
+#Record command history
+echo "Collecting Now: Collecting used command (history)"
+history >> $collecting_path/history.txt 
+echo "List of used command (history) has been collected (history.txt)" | tee -a $collecting_path/case_info.txt
+
+
+
+#echo "Capturing memory will not be included in this script" | tee -a $collecting_path/case_info.txt
+
+echo " " | tee -a $collecting_path/case_info.txt
+echo "***********       Data Collection Is Completed Now        ***********" | tee -a $collecting_path/case_info.txt
+echo " " | tee -a $collecting_path/case_info.txt
+
+#Record the complete date and time
+completed_time=`date`
+echo "The collection end date and time is : $completed_time" | tee -a $collecting_path/case_info.txt
+
+
+echo "Check $collecting_path/case_info.txt for all information during the collection process" | tee -a $collecting_path/case_info.txt
+echo "Check $collecting_path/error folder for all errors during the collection process" | tee -a $collecting_path/case_info.txt
+echo "Check $collecting_path/evidence_checksum.txt for evidence checksum" | tee -a $collecting_path/case_info.txt
