@@ -1,9 +1,5 @@
 #!/bin/bash
 
-#Response script written by Malak K. AlMutairi
-#script version is 001
-#This script is to collect volatile data and selected non-volatile data
-
 clear
 
 #enable history command
